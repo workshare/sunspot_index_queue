@@ -7,7 +7,8 @@ module Sunspot
       # Errors that cause batch processing to stop and are immediately passed on to the caller. All other
       # are logged on the entry on the assumption that they can be fixed later while other entries can still
       # be processed.
-      PASS_THROUGH_EXCEPTIONS = [SystemExit, NoMemoryError, Interrupt, SignalException, Errno::ECONNREFUSED]
+      # [SystemExit, NoMemoryError, Interrupt, SignalException, Errno::ECONNREFUSED]
+      PASS_THROUGH_EXCEPTIONS = [NoMemoryError, Errno::ECONNREFUSED]
       
       def initialize(queue, entries = nil)
         @queue = queue

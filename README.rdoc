@@ -1,3 +1,7 @@
+= Fork notes
+
+Please note: this fork will take out some of the exceptions in PASS_THROUGH_EXCEPTIONS so that they will be treated as usual (that is, we are not going to reset the attempts counter, and we are going to log the raised error). Another change has been made to the set_error!() method to set a lower priority for failing entries.
+
 = Sunspot Index Queue
 
 This gem provides support for asynchronously updating a Solr index with the sunspot gem.
