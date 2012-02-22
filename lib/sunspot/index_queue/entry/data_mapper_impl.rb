@@ -93,6 +93,7 @@ module Sunspot
           self.attempts += 1
           self.run_at = Time.now.utc + (retry_interval * attempts) if retry_interval
           self.error = "#{error.class.name}: #{error.message}\n#{error.backtrace.join("\n")[0, 4000]}"
+          self.priority = -1
           self.lock = nil
           begin
             save!
