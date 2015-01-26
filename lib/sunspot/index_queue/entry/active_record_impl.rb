@@ -73,7 +73,9 @@ module Sunspot
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'priority DESC, run_at')
+            batch_entries = all(:select => "id", :conditions => conditions, :limit => "#{rand 500}, 5")
+            puts "batch_entries before #{batch_entries.inspect}"
+            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'priority DESC, run_at') if batch_entries.blank?
             queue_entry_ids = batch_entries.collect{|entry| entry.id}
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
