@@ -23,6 +23,8 @@ module Sunspot
         
         self.table_name = "sunspot_index_queue_entries"
 
+        before_save :set_queue_position_column
+
         class << self
           # Implementation of the total_count method.
           def total_count(queue)
@@ -65,21 +67,39 @@ module Sunspot
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
             update_all({:run_at => Time.now.utc, :attempts => 0, :error => nil, :lock => nil}, conditions)
           end
-          
-          # Implementation of the next_batch! method.
+         
+          # Implementation of the next_batch! method. 
           def next_batch!(queue)
             conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
             unless queue.class_names.empty?
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
-            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'priority DESC, run_at')
+            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
             queue_entry_ids = batch_entries.collect{|entry| entry.id}
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
             update_all({:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil}, :id => queue_entry_ids)
             all(:conditions => {:id => queue_entry_ids, :lock => lock})
           end
+          # Alternative implementation (indexes would have to be changed).
+          # It performs two queries instead of three and may prevent workers
+          # competing for elements to process while trying to lock rows that
+          # have already been locked by another worker. Even though the update
+          # query is complex and may undermine database performance.
+          #
+          # def next_batch!(queue)
+          #   conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
+          #   unless queue.class_names.empty?
+          #     conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
+          #     conditions << queue.class_names
+          #   end
+          #   batch_entries = where(:conditions => conditions).limit(queue.batch_size).order('queue_postion')
+          #   lock = rand(0x7FFFFFFF)
+          #   batch_entries.select(:id).update_all run_at: queue.retry_interval.from_now.utc, lock: lock, error: nil
+          #   batch_entries.where lock: lock
+          # end
+
 
           # Implementation of the add method.
           def add(klass, id, delete, priority)
@@ -138,6 +158,40 @@ module Sunspot
           rescue => e
             logger.warn(e)
           end
+        end
+
+        # From MYSQL doc:
+        # ---------------------------------------------------------------------
+        # In some cases, MySQL cannot use indexes to resolve the ORDER BY, 
+        # although it still uses indexes to find the rows that match the 
+        # WHERE clause. These cases include the following:
+        #
+        # - You use ORDER BY on different keys:
+        #
+        #   SELECT * FROM t1 ORDER BY key1, key2;
+        # ---------------------------------------------------------------------
+        #
+        # The described condition applies to our query to sort the elements to
+        # be processed since the conditions are to sort by priority DESC and
+        # run_at ASC. To boost database performance a new column has been 
+        # added containing both informations encoded in such a fashion that a 
+        # sort applied on a set of entries returns the entries in the expected 
+        # order. The column is called queue_position and the format of its
+        # values is:
+        # 
+        # "2.0000000000-0001423053863"
+        #
+        # Which represents the inverse value of the priority - the unix time of
+        # the run_at with a padding of zeros. The ASC ordering on those strings
+        # is equivalent to the composed order on priority DESC, run_at ASC.
+        def set_queue_position_column
+          raise "WTF!! Negative priority?" if priority < 0
+          raise "Priority should not be bigger than 2^10" if priority > 20000000000
+          
+          inverse_priority = priority == 0 ? 2 : 1/priority.to_f
+          fixed_width_time = run_at.to_i.to_s[0...13].rjust(13, '0')
+
+          self.queue_position = format("%0.10f", inverse_priority) + '-' + fixed_width_time
         end
       end
     end
