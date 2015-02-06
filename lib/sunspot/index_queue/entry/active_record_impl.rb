@@ -1,4 +1,5 @@
 require 'active_record'
+require 'benchmark'
 
 module Sunspot
   class IndexQueue
@@ -26,6 +27,13 @@ module Sunspot
         before_save :set_queue_position_column
 
         class << self
+          def logger=(logger)
+            @logger = logger
+          end
+
+          def logger
+            @logger
+          end
           # Implementation of the total_count method.
           def total_count(queue)
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
@@ -70,17 +78,32 @@ module Sunspot
          
           # Implementation of the next_batch! method. 
           def next_batch!(queue)
-            conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
-            unless queue.class_names.empty?
-              conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
-              conditions << queue.class_names
+            b_gen_conditions = Benchmark.measure do
+              conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
+              unless queue.class_names.empty?
+                conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
+                conditions << queue.class_names
+              end
             end
-            batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
-            queue_entry_ids = batch_entries.collect{|entry| entry.id}
+            profile 'Generating conditions', b_gen_conditions
+
+            b_select_entries = Benchmark.measure do
+              batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
+              queue_entry_ids = batch_entries.collect{|entry| entry.id}
+            end
+            profile 'Selecting entries', b_select_entries
+
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
-            update_all({:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil}, :id => queue_entry_ids)
-            all(:conditions => {:id => queue_entry_ids, :lock => lock})
+            b_update_entries = Benchmark.measure do
+              update_all({:run_at => queue.retry_interval.from_now.utc, :lock => lock, :error => nil}, :id => queue_entry_ids)
+            end
+            profile 'Queuing entries', b_update_entries
+
+            b_retrieve_entries = Benchmark.measure do
+              all(:conditions => {:id => queue_entry_ids, :lock => lock})
+            end
+            profile 'Retrieving entries', b_retrieve_entries
           end
           # Alternative implementation (indexes would have to be changed).
           # It performs two queries instead of three and may prevent workers
@@ -131,6 +154,13 @@ module Sunspot
 
             connection.add_index table_name, :record_id
             connection.add_index table_name, [:run_at, :record_class_name, :priority], :name => "#{table_name}_run_at"
+          end
+
+          def profile(message, benchmark)
+            logger.info "====== #{message} ======"
+            logger.info benchmark.to_s
+            puts "====== #{message} ======"
+            puts benchmark.to_s
           end
         end
 
