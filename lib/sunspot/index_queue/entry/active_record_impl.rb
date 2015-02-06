@@ -101,9 +101,11 @@ module Sunspot
             profile 'Queuing entries', b_update_entries
 
             b_retrieve_entries = Benchmark.measure do
-              all(:conditions => {:id => queue_entry_ids, :lock => lock})
+              entries = all(:conditions => {:id => queue_entry_ids, :lock => lock})
+              entries.first
             end
             profile 'Retrieving entries', b_retrieve_entries
+            entries
           end
           # Alternative implementation (indexes would have to be changed).
           # It performs two queries instead of three and may prevent workers
