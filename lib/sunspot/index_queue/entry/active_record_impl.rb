@@ -78,6 +78,7 @@ module Sunspot
          
           # Implementation of the next_batch! method. 
           def next_batch!(queue)
+            conditions = nil
             b_gen_conditions = Benchmark.measure do
               conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
               unless queue.class_names.empty?
@@ -87,6 +88,8 @@ module Sunspot
             end
             profile 'Generating conditions', b_gen_conditions
 
+            batch_entries = nil
+            queue_entry_ids = nil
             b_select_entries = Benchmark.measure do
               batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
               queue_entry_ids = batch_entries.collect{|entry| entry.id}
@@ -100,6 +103,7 @@ module Sunspot
             end
             profile 'Queuing entries', b_update_entries
 
+            entries = nil
             b_retrieve_entries = Benchmark.measure do
               entries = all(:conditions => {:id => queue_entry_ids, :lock => lock})
               entries.first
