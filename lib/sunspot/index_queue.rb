@@ -146,6 +146,7 @@ module Sunspot
             break if Entry.ready_count(self) == 0
           else
             batch = Batch.new(self, entries)
+            puts "===== Barch handler defined? #{defined?(@batch_handler) && @batch_handler}"
             if defined?(@batch_handler) && @batch_handler
               @batch_handler.call(batch)
             else
