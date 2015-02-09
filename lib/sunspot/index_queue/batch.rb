@@ -1,3 +1,5 @@
+require 'benchmark'
+
 module Sunspot
   class IndexQueue
     # Batch of entries to be indexed with Solr.
@@ -26,12 +28,21 @@ module Sunspot
         begin
           # First try submitting the entries in a batch since that's the most efficient.
           # If there are errors, try each entry individually in case there's a bad document.
-          session.batch do
-            entries.each do |entry|
-              submit_entry(entry)
+          b_submit = Benchmark.measure do
+            session.batch do
+              entries.each do |entry|
+                submit_entry(entry)
+              end
             end
           end
-          commit!
+          profile 'Submitting', b_submit
+
+          a=nil
+          b_commit = Benchmark.measure do
+            a=commit!
+          end
+          profile 'Committing', b_commit
+          a
         rescue Exception => e
           @delete_entries.clear
           entries.each{|entry| entry.processed = false}
@@ -53,6 +64,13 @@ module Sunspot
       end
 
       private
+
+      def profile(message, benchmark)
+        logger.info "====== #{message} ======"
+        logger.info benchmark.to_s
+        puts "====== #{message} ======"
+        puts benchmark.to_s
+      end
       
       def session
         @queue.session
