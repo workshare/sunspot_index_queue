@@ -138,7 +138,7 @@ module Sunspot
     def process
       count = 0
       loop do
-        entries = Entry.next_batch!(self)
+        entries = batch_size.times.inject([]) { |sum, _| sum + Entry.next_batch!(self) }
         if entries.nil? || entries.empty?
           break if Entry.ready_count(self) == 0
         else

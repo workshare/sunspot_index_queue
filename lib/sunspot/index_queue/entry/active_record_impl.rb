@@ -91,10 +91,11 @@ module Sunspot
             batch_entries = nil
             queue_entry_ids = nil
             b_select_entries = Benchmark.measure do
-              batch_entries = all(:select => "id", :conditions => conditions, :limit => queue.batch_size, :order => 'queue_position')
+              batch_entries = all(:select => "id", :conditions => conditions, :limit => 1, :order => 'queue_position')
               queue_entry_ids = batch_entries.collect{|entry| entry.id}
             end
             profile 'Selecting entries', b_select_entries
+            log 'Selected ids by object #{self.object_id}:', batch_entries.map(&:id)
 
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
@@ -167,6 +168,13 @@ module Sunspot
             logger.info benchmark.to_s
             puts "====== #{message} ======"
             puts benchmark.to_s
+          end
+
+          def log(message, elm)
+            logger.info "===== #{message} ====="
+            logger.info elm.to_s
+            puts "====== #{message} ======"
+            puts elm.to_s
           end
         end
 
