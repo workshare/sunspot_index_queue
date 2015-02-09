@@ -154,7 +154,7 @@ module Sunspot
             count += entries.select{|e| e.processed? }.size
           end
         end
-        puts "===== Process loop: #{b_loop}"
+        puts "===== Process loop: #{b_loop.real}"
       end
       count
     end

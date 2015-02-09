@@ -44,6 +44,8 @@ module Sunspot
           profile 'Committing', b_commit
           a
         rescue Exception => e
+          puts 'Error submit 1'
+          puts e
           @delete_entries.clear
           entries.each{|entry| entry.processed = false}
           if PASS_THROUGH_EXCEPTIONS.include?(e.class)
@@ -53,6 +55,8 @@ module Sunspot
           end
         end
       rescue Exception => e
+        puts 'Error submit 2'
+        puts e
         begin
           clear_processed(entries)
           entries.each{|entry| entry.reset!} if PASS_THROUGH_EXCEPTIONS.include?(e.class)
