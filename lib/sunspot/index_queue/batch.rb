@@ -66,8 +66,6 @@ module Sunspot
       private
 
       def profile(message, benchmark)
-        logger.info "====== #{message} ======"
-        logger.info benchmark.to_s
         puts "====== #{message} ======"
         puts benchmark.to_s
       end

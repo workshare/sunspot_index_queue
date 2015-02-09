@@ -95,7 +95,7 @@ module Sunspot
               queue_entry_ids = batch_entries.collect{|entry| entry.id}
             end
             profile 'Selecting entries', b_select_entries
-            log 'Selected ids by object #{self.object_id}:', batch_entries.map(&:id)
+            log "Selected ids by object #{self.object_id}:", batch_entries.map(&:id)
 
             return [] if queue_entry_ids.empty?
             lock = rand(0x7FFFFFFF)
@@ -110,6 +110,7 @@ module Sunspot
               entries.first
             end
             profile 'Retrieving entries', b_retrieve_entries
+            profile 'TOTAL next_batch! TIME', (b_gen_conditions.real + b_select_entries.real + b_update_entries.real + b_retrieve_entries.real)
             entries
           end
           # Alternative implementation (indexes would have to be changed).

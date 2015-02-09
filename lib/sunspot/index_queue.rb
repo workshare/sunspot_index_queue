@@ -1,3 +1,5 @@
+require 'benchmark'
+
 module Sunspot
   # Implementation of an asynchronous queue for indexing records with Solr. Entries are added to the queue
   # defining which records should be indexed or removed. The queue will then process those entries and
@@ -138,18 +140,21 @@ module Sunspot
     def process
       count = 0
       loop do
-        entries = batch_size.times.inject([]) { |sum, _| sum + Entry.next_batch!(self) }
-        if entries.nil? || entries.empty?
-          break if Entry.ready_count(self) == 0
-        else
-          batch = Batch.new(self, entries)
-          if defined?(@batch_handler) && @batch_handler
-            @batch_handler.call(batch)
+        b_loop = Benchmark.measure do
+          entries = batch_size.times.inject([]) { |sum, _| sum + Entry.next_batch!(self) }
+          if entries.nil? || entries.empty?
+            break if Entry.ready_count(self) == 0
           else
-            batch.submit!
+            batch = Batch.new(self, entries)
+            if defined?(@batch_handler) && @batch_handler
+              @batch_handler.call(batch)
+            else
+              batch.submit!
+            end
+            count += entries.select{|e| e.processed? }.size
           end
-          count += entries.select{|e| e.processed? }.size
         end
+        puts "===== Process loop: #{b_loop}"
       end
       count
     end
