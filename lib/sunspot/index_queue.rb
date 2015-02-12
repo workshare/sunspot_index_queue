@@ -155,7 +155,7 @@ module Sunspot
             count += entries.select{|e| e.processed? }.size
           end
         end
-        puts "===== Process loop: #{b_loop.try(:real) ? b_loop.real : 'Entry.ready_count is 0!'}"
+        puts "===== Process loop: #{b_loop ? b_loop.real : 'Entry.ready_count is 0!'}"
       end
       count
     end
