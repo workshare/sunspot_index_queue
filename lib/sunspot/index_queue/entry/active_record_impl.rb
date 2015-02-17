@@ -109,8 +109,7 @@ module Sunspot
             queue_entry.priority = priority if priority > queue_entry.priority
             queue_entry.run_at = Time.now.utc
             queue_entry.save!
-          rescue Mysql2::Error => e
-            raise(e) unless e.message.include?("Duplicate entry")
+          rescue ActiveRecord::RecordNotUnique => e
             false
           end
           
