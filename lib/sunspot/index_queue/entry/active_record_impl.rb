@@ -26,6 +26,42 @@ module Sunspot
         before_save :set_queue_position_column
 
         class << self
+
+          # From MYSQL doc:
+          # ---------------------------------------------------------------------
+          # In some cases, MySQL cannot use indexes to resolve the ORDER BY, 
+          # although it still uses indexes to find the rows that match the 
+          # WHERE clause. These cases include the following:
+          #
+          # - You use ORDER BY on different keys:
+          #
+          #   SELECT * FROM t1 ORDER BY key1, key2;
+          # ---------------------------------------------------------------------
+          #
+          # The described condition applies to our query to sort the elements to
+          # be processed since the conditions are to sort by priority DESC and
+          # run_at ASC. To boost database performance a new column has been 
+          # added containing both informations encoded in such a fashion that a 
+          # sort applied on a set of entries returns the entries in the expected 
+          # order. The column is called queue_position and the format of its
+          # values is:
+          # 
+          # "2.0000000000-0001423053863"
+          #
+          # Which represents the inverse value of the priority - the unix time of
+          # the run_at with a padding of zeros. The ASC ordering on those strings
+          # is equivalent to the composed order on priority DESC, run_at ASC.
+          def calculate_queue_position_column(priority, run_at)
+            raise "WTF!! Priority should not be smaller than -10" if priority < -10
+            raise "Priority should not be bigger than 2^10" if priority > 20000000000
+            
+            priority = priority + 10
+            inverse_priority = priority == 0 ? 2 : 1/priority.to_f
+            fixed_width_time = run_at.to_i.to_s[0...13].rjust(13, '0')
+
+            format("%0.10f", inverse_priority) + '-' + fixed_width_time
+          end
+
           # Implementation of the total_count method.
           def total_count(queue)
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
@@ -162,38 +198,8 @@ module Sunspot
           end
         end
 
-        # From MYSQL doc:
-        # ---------------------------------------------------------------------
-        # In some cases, MySQL cannot use indexes to resolve the ORDER BY, 
-        # although it still uses indexes to find the rows that match the 
-        # WHERE clause. These cases include the following:
-        #
-        # - You use ORDER BY on different keys:
-        #
-        #   SELECT * FROM t1 ORDER BY key1, key2;
-        # ---------------------------------------------------------------------
-        #
-        # The described condition applies to our query to sort the elements to
-        # be processed since the conditions are to sort by priority DESC and
-        # run_at ASC. To boost database performance a new column has been 
-        # added containing both informations encoded in such a fashion that a 
-        # sort applied on a set of entries returns the entries in the expected 
-        # order. The column is called queue_position and the format of its
-        # values is:
-        # 
-        # "2.0000000000-0001423053863"
-        #
-        # Which represents the inverse value of the priority - the unix time of
-        # the run_at with a padding of zeros. The ASC ordering on those strings
-        # is equivalent to the composed order on priority DESC, run_at ASC.
         def set_queue_position_column
-          raise "WTF!! Negative priority?" if priority < 0
-          raise "Priority should not be bigger than 2^10" if priority > 20000000000
-          
-          inverse_priority = priority == 0 ? 2 : 1/priority.to_f
-          fixed_width_time = run_at.to_i.to_s[0...13].rjust(13, '0')
-
-          self.queue_position = format("%0.10f", inverse_priority) + '-' + fixed_width_time
+          self.queue_position = self.class.calculate_queue_position_column(priority, run_at)
         end
       end
     end
