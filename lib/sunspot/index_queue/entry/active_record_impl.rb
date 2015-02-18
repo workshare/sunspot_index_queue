@@ -53,7 +53,7 @@ module Sunspot
           # is equivalent to the composed order on priority DESC, run_at ASC.
           def calculate_queue_position_column(priority, run_at)
             raise "WTF!! Priority should not be smaller than -10" if priority < -10
-            raise "Priority should not be bigger than 2^10" if priority > 20000000000
+            raise "Priority should not be bigger than 10^4" if priority > 10000
             
             priority = priority + 10
             inverse_priority = priority == 0 ? 2 : 1/priority.to_f
