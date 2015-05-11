@@ -101,7 +101,7 @@ module Sunspot
           # Implementation of the reset! method.
           def reset! (queue)
             conditions = queue.class_names.empty? ? {} : {:record_class_name => queue.class_names}
-            update_all({:run_at => Time.now.utc, :attempts => 0, :error => nil, :lock => nil}, conditions)
+            update_all({:run_at => Time.now.utc, :attempts => 0, :error => nil, :lock => 0}, conditions)
           end
          
           # Implementation of the next_batch! method. 
@@ -139,7 +139,7 @@ module Sunspot
 
           # Implementation of the add method.
           def add(klass, id, delete, priority)
-            queue_entry_key = {:record_id => id, :record_class_name => klass.name, :lock => nil}
+            queue_entry_key = {:record_id => id, :record_class_name => klass.name, :lock => 0}
             queue_entry = first(:conditions => queue_entry_key) || new(queue_entry_key.merge(:priority => priority))
             queue_entry.is_delete = delete
             queue_entry.priority = priority if priority > queue_entry.priority
@@ -162,7 +162,7 @@ module Sunspot
               t.boolean :is_delete, :null => false, :default => false
               t.datetime :run_at, :null => false
               t.integer :priority, :null => false, :default => 0
-              t.integer :lock, :null => true
+              t.integer :lock, :null => false, :default => 0
               t.string :error, :null => true, :limit => 4000
               t.integer :attempts, :null => false, :default => 0
             end
@@ -178,7 +178,7 @@ module Sunspot
           self.run_at = (retry_interval * attempts).from_now.utc if retry_interval
           self.error = "#{error.class.name}: #{error.message}\n#{error.backtrace.join("\n")[0, 4000]}"
           self.priority = -1
-          self.lock = nil
+          self.lock = 0
           begin
             save!
           rescue => e
@@ -192,7 +192,7 @@ module Sunspot
         # Implementation of the reset! method.
         def reset!
           begin
-            update_attributes!(:attempts => 0, :error => nil, :lock => nil, :run_at => Time.now.utc)
+            update_attributes!(:attempts => 0, :error => nil, :lock => 0, :run_at => Time.now.utc)
           rescue => e
             logger.warn(e)
           end
