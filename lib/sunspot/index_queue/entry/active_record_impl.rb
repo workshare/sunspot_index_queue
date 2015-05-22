@@ -106,7 +106,7 @@ module Sunspot
          
           # Implementation of the next_batch! method. 
           def next_batch!(queue)
-            conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
+            conditions = ["#{connection.quote_column_name('run_at')} <= ? AND #{connection.quote_column_name('lock')} = 0", Time.now.utc]
             unless queue.class_names.empty?
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
