@@ -177,8 +177,11 @@ module Sunspot
           self.attempts += 1
           self.run_at = (retry_interval * attempts).from_now.utc if retry_interval
           self.error = "#{error.class.name}: #{error.message}\n#{error.backtrace.join("\n")[0, 4000]}"
-          self.priority = -1
+          self.priority -= 1
           self.lock = 0
+
+          discard! if discard?
+
           begin
             save!
           rescue => e
@@ -187,6 +190,40 @@ module Sunspot
               logger.warn(e)
             end
           end
+        end
+
+        def discard?
+          ( too_many_attempts? || deadly_error? ) && deletable?
+        end
+
+        def too_many_attempts?
+          attempts > max_attempts
+        end
+
+        def deadly_error?
+          deadly_errors.any? { |e| error.to_s.include? e }
+        end
+
+        def deletable?
+          ! undeletable_classes.include?(record_class_name)
+        end
+
+        cattr_accessor :max_attempts
+
+        def self.max_attempts
+          @@max_attempts ||= 5
+        end
+
+        cattr_accessor :deadly_errors
+
+        def self.deadly_errors
+          @@deadly_errors ||= []
+        end
+
+        cattr_accessor :undeletable_classes
+
+        def self.undeletable_classes
+          @@undeletable_classes ||= []
         end
 
         # Implementation of the reset! method.
