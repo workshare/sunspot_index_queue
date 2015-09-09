@@ -184,13 +184,13 @@ module Sunspot
           self.priority -= 1
           self.lock = 0
 
+          logger.warn(error)
           discard! if discard?
 
           begin
             save!
           rescue => e
             if logger
-              logger.warn(error)
               logger.warn(e)
             end
           end
@@ -198,6 +198,11 @@ module Sunspot
 
         def discard?
           ( too_many_attempts? || deadly_error? ) && deletable?
+        end
+
+        def discard!
+          logger.warn("Discarding #{self.inspect}")
+          destroy
         end
 
         def too_many_attempts?
