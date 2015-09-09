@@ -70,12 +70,16 @@ module Sunspot
           
           # Implementation of the ready_count method.
           def ready_count(queue)
-            conditions = ["#{connection.quote_column_name('run_at')} <= ?", Time.now.utc]
+            conditions = basic_conditions
             unless queue.class_names.empty?
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
             end
             count(:conditions => conditions)
+          end
+
+          def basic_conditions
+            ["#{connection.quote_column_name('run_at')} <= ? AND #{connection.quote_column_name('lock')} = 0", Time.now.utc]
           end
 
           # Implementation of the error_count method.
@@ -106,7 +110,7 @@ module Sunspot
          
           # Implementation of the next_batch! method. 
           def next_batch!(queue)
-            conditions = ["#{connection.quote_column_name('run_at')} <= ? AND #{connection.quote_column_name('lock')} = 0", Time.now.utc]
+            conditions = basic_conditions
             unless queue.class_names.empty?
               conditions.first << " AND #{connection.quote_column_name('record_class_name')} IN (?)"
               conditions << queue.class_names
