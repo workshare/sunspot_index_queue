@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = "sunspot_index_queue"
-  s.version = "1.1.4"
+  s.version = "1.1.5"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brian Durand"]
@@ -92,4 +92,3 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<jeweler>, [">= 0"])
   end
 end
-
